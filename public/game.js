@@ -1,6 +1,6 @@
 
 // public/game.js
-const VERSION = "1.0.0";
+const VERSION = "0.0.1";
 const ROWS = 59;
 const COLUMNS = 42;
 const CELL_SIZE = 40;
