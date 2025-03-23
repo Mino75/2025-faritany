@@ -11,7 +11,7 @@ const ASSETS = [
   '/manifest.json',
   '/icon-512.png',
   '/icon-192.png',
-  '/favicon.webp'
+  '/favicon.ico'
 ];
 
 // Install: Download all assets into a temporary cache.
