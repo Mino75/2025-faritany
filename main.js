@@ -41,8 +41,8 @@ const board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 
 // Player information
 const players = {
-  blue: { name: "Mino", color: "blue" },
-  red: { name: "Chen", color: "red" }
+  blue: { name: "Mino🪲", color: "blue" },
+  red: { name: "Chen🐞", color: "red" }
 };
 
 // Scores for each player
