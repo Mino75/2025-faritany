@@ -322,3 +322,20 @@ window.addEventListener('resize', () => {
 // Initial Draw
 // ----------------------
 drawBoard();
+
+
+//Open close the popup
+
+document.getElementById('showRulesBtn').onclick = function() {
+  document.getElementById('rulesPopup').style.display = 'flex';
+};
+
+document.getElementById('closeRulesBtn').onclick = function() {
+  document.getElementById('rulesPopup').style.display = 'none';
+};
+
+// Optional: Click outside popup to close
+document.getElementById('rulesPopup').onclick = function(e) {
+  if (e.target === this) this.style.display = 'none';
+};
+
