@@ -47,6 +47,38 @@ style.innerHTML = `
     margin-top: 0;
   }
 
+.custom-popup {
+  display: none; /* Hidden by default */
+  position: fixed;
+  z-index: 9999;
+  left: 0; top: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.5);
+  justify-content: center; align-items: center;
+}
+
+.custom-popup-content {
+  background: #fff;
+  padding: 2.5rem 2rem;
+  border-radius: 20px;
+  max-width: 700px;
+  width: 90%;
+  box-shadow: 0 10px 50px rgba(0,0,0,0.2);
+  position: relative;
+  font-size: 1.2rem;
+}
+
+.custom-popup-close {
+  position: absolute; top: 18px; right: 18px;
+  background: none; border: none; font-size: 2rem;
+  cursor: pointer; color: #888;
+}
+
+.custom-popup-content h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+
   #rules p {
     margin: 0.5em 0;
     font-size: 0.9em;
