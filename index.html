@@ -13,12 +13,14 @@
   <div id="container">
     <!-- Sidebar always visible on the left -->
     <aside id="sidebar">
-      <h2>Scores & Rules</h2>
+      <h2>Faritany</h2>
       <div id="score"></div>
 
       <!-- Button to open the popup -->
       <button id="showRulesBtn" style="margin: 1rem;">Show Game Rules</button>
-      
+      <div id="minimapContainer" style="margin: 1rem 0;">
+      <canvas id="minimap"  style="background: #222; border-radius: 10px;"></canvas>
+      </div>
       <!-- Custom Popup for Rules -->
       <div id="rulesPopup" class="custom-popup">
         <div class="custom-popup-content">
@@ -36,7 +38,7 @@
       
     </aside>
     <!-- Game area occupies the remaining space -->
-    <main id="game-area">
+    <main id="game-area" >
       <canvas id="plateau"></canvas>
     </main>
   </div>

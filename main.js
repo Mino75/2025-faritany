@@ -17,21 +17,24 @@ if ('serviceWorker' in navigator) {
 // Board configuration
 const COLS = 22;  // 22 columns
 const ROWS = 38;  // 38 rows
-let CELL_SIZE = 30; // Default cell size (will be recalculated)
+const CELL_SIZE = 60; // Default cell size (will be recalculated)
 
 // Get DOM elements
 const canvas = document.getElementById("plateau");
 const ctx = canvas.getContext("2d");
 const gameArea = document.getElementById("game-area");
 
+canvas.width = COLS * CELL_SIZE;   // 660
+canvas.height = ROWS * CELL_SIZE;  // 1140
+
 // Function to update canvas size based on available game area width
-function updateCanvasSize() {
-  const availableWidth = gameArea.clientWidth;
-  CELL_SIZE = availableWidth / COLS;
-  canvas.width = availableWidth;
-  canvas.height = ROWS * CELL_SIZE;
-}
-updateCanvasSize();
+//function updateCanvasSize() {
+//  const availableWidth = gameArea.clientWidth;
+//  CELL_SIZE = availableWidth / COLS;
+//  canvas.width = availableWidth;
+//  canvas.height = ROWS * CELL_SIZE;
+//}
+// updateCanvasSize();
 
 // Create the board as a 2D array.
 // Each cell is either null or an object representing a point:
@@ -41,8 +44,8 @@ const board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 
 // Player information
 const players = {
-  blue: { name: "Mino🪲", color: "blue" },
-  red: { name: "Chen🐞", color: "red" }
+  blue: { name: "Mino🪲", color: "#009CFF" },
+  red: { name: "Chen🐞", color: "#FF4500" }
 };
 
 // Scores for each player
@@ -80,21 +83,33 @@ function drawBoard() {
   }
 
   // Draw points (using a radius of 1/6 of cell size)
-  for (let j = 0; j < ROWS; j++) {
-    for (let i = 0; i < COLS; i++) {
-      const point = board[j][i];
-      if (point) {
-        ctx.beginPath();
-        ctx.arc(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE / 6, 0, Math.PI * 2);
-        ctx.fillStyle = point.color;
-        // If the point is inactive (encircled), draw it with a darker shade (or add an outline)
-        ctx.globalAlpha = point.active ? 1.0 : 0.5;
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-      }
+for (let j = 0; j < ROWS; j++) {
+  for (let i = 0; i < COLS; i++) {
+    const point = board[j][i];
+    if (!point) continue; // Skip empty cells
+
+    // Draw the colored dot (active = opaque, inactive = faded)
+    ctx.beginPath();
+    ctx.arc(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE / 6, 0, Math.PI * 2);
+    ctx.fillStyle = point.color;
+    ctx.globalAlpha = point.active ? 1.0 : 0.5;
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    // If the point is inactive, draw an emoji on top
+    if (!point.active) {
+      ctx.font = `${CELL_SIZE * 0.8}px serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      // Use color to determine emoji
+      let emoji = "";
+      if (point.owner === "blue") emoji = "🪲";
+      else if (point.owner === "red") emoji = "🐞";
+      // Center emoji over the point
+      ctx.fillText(emoji, i * CELL_SIZE, j * CELL_SIZE);
     }
   }
-
+}
   // Draw encirclement borders
   encirclements.forEach(borderPoints => {
     if (borderPoints.length > 0) {
@@ -113,11 +128,11 @@ function drawBoard() {
     }
   });
 
-  // Update the sidebar with score and current player info
-  document.getElementById("score").textContent =
-    `Score – ${players.blue.name} (Blue): ${scores.blue}\n` +
-    `${players.red.name} (Red): ${scores.red}\n` +
-    `Current Player: ${players[currentPlayer].name} (${currentPlayer})`;
+// Update the sidebar with score and current player info
+document.getElementById("score").innerHTML =
+  `${players.blue.name} (Blue): ${scores.blue}<br>` +
+  `${players.red.name} (Red): ${scores.red}<br><br>` +
+  `Current Player: ${players[currentPlayer].name} (${currentPlayer})`;
 }
 
 // ----------------------
@@ -157,7 +172,11 @@ canvas.addEventListener("click", (event) => {
   if (!inBounds(i, j)) return;
   // Place a point only if the intersection is empty
   if (board[j][i] === null) {
-    board[j][i] = { color: currentPlayer, active: true };
+    board[j][i] = { 
+      color: players[currentPlayer].color, // the display color (hex)
+      owner: currentPlayer,                // "blue" or "red"
+      active: true
+                  };
     // Check for encirclements around the newly placed point
     detectEncirclements(i, j);
     // Switch current player automatically
@@ -185,13 +204,13 @@ function detectEncirclements(x, y) {
     const key = `${nx},${ny}`;
     // Only process zones that do NOT have an active current player's point.
     // Note: disabled points (active:false) are treated as not available.
-    if ((!board[ny][nx] || !board[ny][nx].active || board[ny][nx].color !== currentPlayer) && !globalVisited.has(key)) {
+    if ((!board[ny][nx] || !board[ny][nx].active || board[ny][nx].owner !== currentPlayer) && !globalVisited.has(key)) {
       const result = exploreZone(nx, ny, currentPlayer, globalVisited);
       if (result.enclosed && result.containsEnemy) {
         // Update score: +1 for each enemy active point in the zone
         result.cells.forEach(([ci, cj]) => {
           const pt = board[cj][ci];
-          if (pt && pt.color !== currentPlayer && pt.active) {
+          if (pt && pt.owner !== currentPlayer && pt.active) {
             scores[currentPlayer]++;
             // Mark the point as disabled (encircled)
             pt.active = false;
@@ -233,7 +252,7 @@ function exploreZone(i, j, player, globalVisited) {
 
     // If cell contains an active enemy point, note its presence.
     const pt = board[cj][ci];
-    if (pt && pt.color !== player && pt.active) {
+    if (pt && pt.owner !== player && pt.active) {
       containsEnemy = true;
     }
 
@@ -244,7 +263,7 @@ function exploreZone(i, j, player, globalVisited) {
       if (inBounds(ni, nj)) {
         const nKey = `${ni},${nj}`;
         const neighbor = board[nj][ni];
-        if (!localVisited.has(nKey) && (!neighbor || !neighbor.active || neighbor.color !== player)) {
+        if (!localVisited.has(nKey) && (!neighbor || !neighbor.active || neighbor.owner !== player)) {
           stack.push([ni, nj]);
         }
       }
@@ -270,7 +289,7 @@ function getBorderPoints(zoneCells, player) {
       const nj = j + dy;
       if (inBounds(ni, nj)) {
         const neighbor = board[nj][ni];
-        if (neighbor && neighbor.color === player && neighbor.active) {
+        if (neighbor && neighbor.owner === player && neighbor.active) {
           borderSet.add(`${ni},${nj}`);
         }
       }
@@ -314,7 +333,7 @@ function cross(o, a, b) {
 
 // Adjust canvas size when the window is resized
 window.addEventListener('resize', () => {
-  updateCanvasSize();
+  //updateCanvasSize();
   drawBoard();
 });
 

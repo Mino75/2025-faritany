@@ -57,7 +57,7 @@ style.innerHTML = `
 }
 
 .custom-popup-content {
-  background: #fff;
+  background: #000000;
   padding: 2.5rem 2rem;
   border-radius: 20px;
   max-width: 700px;
@@ -83,5 +83,48 @@ style.innerHTML = `
     margin: 0.5em 0;
     font-size: 0.9em;
   }
+
+#showRulesBtn {
+  margin: 1rem;
+  padding: 0.75em 2em;
+  background: linear-gradient(90deg, #ff5200 0%, #ff8100 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 1.2rem;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 16px 0 rgba(255, 100, 0, 0.2);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+  outline: none;
+}
+
+#showRulesBtn:hover, #showRulesBtn:focus {
+  background: linear-gradient(90deg, #ff4500 0%, #ff8100 100%);
+  box-shadow: 0 4px 24px 0 rgba(255, 100, 0, 0.25);
+  transform: translateY(-2px) scale(1.03);
+}
+
+#showRulesBtn:active {
+  background: #ff4500;
+  transform: scale(0.97);
+}
+
+#game-area {
+  overflow: auto;
+  width: 100vw;
+  background: #181818;
+}
+
+#plateau {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
 `;
 document.head.appendChild(style);
