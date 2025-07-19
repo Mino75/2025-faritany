@@ -129,10 +129,24 @@ for (let j = 0; j < ROWS; j++) {
   });
 
 // Update the sidebar with score and current player info
-document.getElementById("score").innerHTML =
-  `${players.blue.name} (Blue): ${scores.blue}<br>` +
-  `${players.red.name} (Red): ${scores.red}<br><br>` +
-  `Current Player: ${players[currentPlayer].name} (${currentPlayer})`;
+  document.getElementById("score").innerHTML =
+    `<span id="blue-name" contenteditable="true" style="cursor:text" ` +
+      `onblur="updateName('blue')">${players.blue.name}</span> (Blue): ${scores.blue}<br>` +
+    `<span id="red-name"  contenteditable="true" style="cursor:text" ` +
+      `onblur="updateName('red')">${players.red.name}</span> (Red): ${scores.red}<br><br>` +
+    `Current Player: ${players[currentPlayer].name} (${currentPlayer})`;
+}
+
+// Called when  finish editing a name
+function updateName(color) {
+  const el = document.getElementById(`${color}-name`);
+  const newName = el.textContent.trim();
+  if (newName) {
+    players[color].name = newName;
+  } else {
+    // revert to previous if you cleared it entirely
+    el.textContent = players[color].name;
+  }
 }
 
 // ----------------------
