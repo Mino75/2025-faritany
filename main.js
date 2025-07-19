@@ -103,8 +103,8 @@ for (let j = 0; j < ROWS; j++) {
       ctx.textBaseline = "middle";
       // Use color to determine emoji
       let emoji = "";
-      if (point.owner === "blue") emoji = "🪲";
-      else if (point.owner === "red") emoji = "🐞";
+      if (point.owner === "blue") emoji = "🐞";
+      else if (point.owner === "red") emoji = "🪲";
       // Center emoji over the point
       ctx.fillText(emoji, i * CELL_SIZE, j * CELL_SIZE);
     }
