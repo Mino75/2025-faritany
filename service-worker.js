@@ -135,6 +135,18 @@ self.addEventListener('activate', event => {
         
         // Clean temp cache
         await caches.delete(TEMP_CACHE);
+
+        // Clean up old version caches
+        const allCacheNames = await caches.keys();
+        const oldCaches = allCacheNames.filter(cacheName => 
+          cacheName.startsWith('faritany-') && 
+          cacheName !== LIVE_CACHE && 
+          cacheName !== TEMP_CACHE
+        );
+        
+        console.log(`Service Worker: Deleting ${oldCaches.length} old caches:`, oldCaches);
+        await Promise.all(oldCaches.map(cacheName => caches.delete(cacheName)));
+
         
         // Notify clients that new version is ready
         const clients = await self.clients.matchAll();
