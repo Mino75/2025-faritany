@@ -169,7 +169,11 @@ self.addEventListener('activate', event => {
 
 // ROBUST STRATEGY: NETWORK FIRST WITH FULL APP CACHE FALLBACK
 self.addEventListener('fetch', event => {
-  event.respondWith(handleFetch(event.request));
+  // Only handle same-origin requests, let browser handle external domains naturally
+  if (event.request.url.startsWith(self.location.origin)) {
+    event.respondWith(handleFetch(event.request));
+  }
+  // External domains like analytics.kahiether.com pass through automatically
 });
 
 async function handleFetch(request) {
