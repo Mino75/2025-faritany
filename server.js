@@ -4,6 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const app = express();
 
+
+// CACHE VERSION MANAGEMENT - Change this to deploy new version
+const CACHE_VERSION = process.env.CACHE_VERSION || 'v2';
+const APP_NAME = process.env.APP_NAME || 'faritany';
+
 // Cache Lock Rescue - Intercept main.js to inject rescue code
 app.get('/main.js', (req, res) => {
   try {
@@ -12,21 +17,21 @@ app.get('/main.js', (req, res) => {
     
     // Inject ONLY the rescue detection code at the beginning
     const rescueCode = `
-// Cache Lock Rescue - Check for V1 users and free them
+// Cache Lock Rescue - Check for ${CACHE_VERSION} users and free older versions
 if ('serviceWorker' in navigator) {
   caches.keys().then(cacheNames => {
-    const hasV2 = cacheNames.some(name => name.includes('-v2'));
+    const hasCurrentVersion = cacheNames.some(name => name.includes('-${CACHE_VERSION}'));
     
-    if (!hasV2 && cacheNames.length > 0) {
-      // V1 detected - unregister and reload
-      console.log('Cache lock detected - rescuing...');
+    if (!hasCurrentVersion && cacheNames.length > 0) {
+      // Old version detected - unregister and reload
+      console.log('Cache lock detected - rescuing to ${CACHE_VERSION}...');
       navigator.serviceWorker.getRegistration().then(reg => {
         if (reg) reg.unregister().then(() => location.reload());
       });
-      return; // Stop here for V1 users
+      return; // Stop here for old version users
     }
     
-    // V2+ users or new users - normal service worker registration
+    // Current version users or new users - normal service worker registration
     navigator.serviceWorker.register('/service-worker.js', {updateViaCache: 'none'});
   });
 }
@@ -42,6 +47,34 @@ if ('serviceWorker' in navigator) {
   } catch (error) {
     console.error('Error serving main.js:', error);
     res.status(500).send('Error loading main.js');
+  }
+});
+
+// Service Worker with cache-busting headers and version injection
+app.get('/service-worker.js', (req, res) => {
+  try {
+    // Read your service-worker.js file
+    let swContent = fs.readFileSync(path.join(__dirname, 'service-worker.js'), 'utf8');
+    
+    // Inject current version into service worker
+    const versionInjection = `
+// Version injected by server
+self.SW_CACHE_NAME = self.SW_CACHE_NAME || '${APP_NAME}-${CACHE_VERSION}';
+self.SW_TEMP_CACHE_NAME = self.SW_TEMP_CACHE_NAME || '${APP_NAME}-temp-${CACHE_VERSION}';
+`;
+    
+    swContent = versionInjection + '\n' + swContent;
+    
+    // Cache-busting headers
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.send(swContent);
+    
+  } catch (error) {
+    console.error('Error serving service worker:', error);
+    res.status(500).send('Error loading service worker');
   }
 });
 
