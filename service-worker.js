@@ -15,6 +15,7 @@ const TEMP_CACHE = CONFIG.TEMP_CACHE_NAME;
 const ASSETS = [
   '/',
   '/index.html',
+  '/main.js',
   '/styles.js',
   '/manifest.json',
   '/icon-512.png',
@@ -146,7 +147,7 @@ async function fetchFromNetworkWithExtendedTimeout(request) {
     
     // Extended timeout for first-time users (30 seconds)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Network request timeout - first time user')), 30000);
+      setTimeout(() => reject(new Error('Network request timeout - first time user')), CONFIG.FIRST_TIME_TIMEOUT);
     });
     
     const networkResponse = await Promise.race([
@@ -198,7 +199,7 @@ async function fetchFromNetworkWithFallback(request) {
     
     // Create timeout promise (5 seconds max wait)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Network request timeout')), 5000);
+      setTimeout(() => reject(new Error('Network request timeout')), CONFIG.RETURNING_USER_TIMEOUT);
     });
     
     // Race between network request and timeout
