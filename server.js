@@ -61,6 +61,9 @@ app.get('/service-worker.js', (req, res) => {
 // Version injected by server
 self.SW_CACHE_NAME = self.SW_CACHE_NAME || '${APP_NAME}-${CACHE_VERSION}';
 self.SW_TEMP_CACHE_NAME = self.SW_TEMP_CACHE_NAME || '${APP_NAME}-temp-${CACHE_VERSION}';
+self.SW_FIRST_TIME_TIMEOUT = '${process.env.SW_FIRST_TIME_TIMEOUT || '20000'}'; // Reduced from 30s
+self.SW_RETURNING_USER_TIMEOUT = '${process.env.SW_RETURNING_USER_TIMEOUT || '5000'}';
+self.SW_ENABLE_LOGS = '${process.env.SW_ENABLE_LOGS || 'true'}';
 `;
     
     swContent = versionInjection + '\n' + swContent;
@@ -77,35 +80,6 @@ self.SW_TEMP_CACHE_NAME = self.SW_TEMP_CACHE_NAME || '${APP_NAME}-temp-${CACHE_V
     res.status(500).send('Error loading service worker');
   }
 });
-
-// Service Worker with cache-busting headers
-app.get('/service-worker.js', (req, res) => {
-  try {
-    // Read your actual service-worker.js file
-    let swContent = fs.readFileSync(path.join(__dirname, 'service-worker.js'), 'utf8');
-    
-    // Only inject environment variables (configuration)
-    const envVars = `
-// Environment variables
-self.SW_CACHE_NAME = '${process.env.SW_CACHE_NAME || 'faritany-v2'}';
-self.SW_TEMP_CACHE_NAME = '${process.env.SW_TEMP_CACHE_NAME || 'faritany-temp-v2'}';
-self.SW_FIRST_TIME_TIMEOUT = '${process.env.SW_FIRST_TIME_TIMEOUT || '30000'}';
-self.SW_RETURNING_USER_TIMEOUT = '${process.env.SW_RETURNING_USER_TIMEOUT || '5000'}';
-self.SW_ENABLE_LOGS = '${process.env.SW_ENABLE_LOGS || 'true'}';
-`;
-    
-    swContent = envVars + '\n' + swContent;
-    
-    res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.send(swContent);
-    
-  } catch (error) {
-    console.error('Error serving service worker:', error);
-    res.status(500).send('Error loading service worker');
-  }
-});
-
 
 app.use(express.static(__dirname));
 
