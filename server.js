@@ -1,7 +1,78 @@
 // server.js
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const app = express();
+
+// Cache Lock Rescue - Intercept main.js to inject rescue code
+app.get('/main.js', (req, res) => {
+  try {
+    // Read the actual main.js file (your existing game/app code)
+    let jsContent = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
+    
+    // Inject ONLY the rescue detection code at the beginning
+    const rescueCode = `
+// Cache Lock Rescue - Check for V1 users and free them
+if ('serviceWorker' in navigator) {
+  caches.keys().then(cacheNames => {
+    const hasV2 = cacheNames.some(name => name.includes('-v2'));
+    
+    if (!hasV2 && cacheNames.length > 0) {
+      // V1 detected - unregister and reload
+      console.log('Cache lock detected - rescuing...');
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg) reg.unregister().then(() => location.reload());
+      });
+      return; // Stop here for V1 users
+    }
+    
+    // V2+ users or new users - normal service worker registration
+    navigator.serviceWorker.register('/service-worker.js', {updateViaCache: 'none'});
+  });
+}
+`;
+    
+    // Prepend rescue code to your existing main.js
+    const finalContent = rescueCode + '\n\n' + jsContent;
+    
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(finalContent);
+    
+  } catch (error) {
+    console.error('Error serving main.js:', error);
+    res.status(500).send('Error loading main.js');
+  }
+});
+
+// Service Worker with cache-busting headers
+app.get('/service-worker.js', (req, res) => {
+  try {
+    // Read your actual service-worker.js file
+    let swContent = fs.readFileSync(path.join(__dirname, 'service-worker.js'), 'utf8');
+    
+    // Only inject environment variables (configuration)
+    const envVars = `
+// Environment variables
+self.SW_CACHE_NAME = '${process.env.SW_CACHE_NAME || 'faritany-v2'}';
+self.SW_TEMP_CACHE_NAME = '${process.env.SW_TEMP_CACHE_NAME || 'faritany-temp-v2'}';
+self.SW_FIRST_TIME_TIMEOUT = '${process.env.SW_FIRST_TIME_TIMEOUT || '30000'}';
+self.SW_RETURNING_USER_TIMEOUT = '${process.env.SW_RETURNING_USER_TIMEOUT || '5000'}';
+self.SW_ENABLE_LOGS = '${process.env.SW_ENABLE_LOGS || 'true'}';
+`;
+    
+    swContent = envVars + '\n' + swContent;
+    
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.send(swContent);
+    
+  } catch (error) {
+    console.error('Error serving service worker:', error);
+    res.status(500).send('Error loading service worker');
+  }
+});
+
 
 app.use(express.static(__dirname));
 
