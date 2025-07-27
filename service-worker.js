@@ -1,8 +1,16 @@
-// service-worker.js
+// service-worker.js - ROBUST VERSION FOR FARITANY
 
-// Generate a unique cache name based on the current timestamp.
-const LIVE_CACHE = 'faritany-v2';
-const TEMP_CACHE = 'faritant-temp-v2';
+// CONFIGURABLE PARAMETERS - Override with environment variables
+const CONFIG = {
+  CACHE_NAME: self.SW_CACHE_NAME || 'faritany-v2',
+  TEMP_CACHE_NAME: self.SW_TEMP_CACHE_NAME || 'faritany-temp-v2',
+  FIRST_TIME_TIMEOUT: parseInt(self.SW_FIRST_TIME_TIMEOUT) || 30000, // 30 seconds
+  RETURNING_USER_TIMEOUT: parseInt(self.SW_RETURNING_USER_TIMEOUT) || 5000, // 5 seconds
+  ENABLE_LOGS: self.SW_ENABLE_LOGS !== 'false' // true by default, false if set to 'false'
+};
+
+const LIVE_CACHE = CONFIG.CACHE_NAME;
+const TEMP_CACHE = CONFIG.TEMP_CACHE_NAME;
 
 const ASSETS = [
   '/',
@@ -14,9 +22,18 @@ const ASSETS = [
   '/favicon.ico'
 ];
 
-/ Install: Download all assets into a temporary cache.
+// Logging helper
+function log(message) {
+  if (CONFIG.ENABLE_LOGS) {
+    console.log(`Service Worker: ${message}`);
+  }
+}
+
+// Install: Download all assets into a temporary cache.
 self.addEventListener('install', event => {
   console.log('Service Worker: Installing...');
+  self.skipWaiting(); // Force immediate activation
+  
   event.waitUntil(
     caches.open(TEMP_CACHE).then(tempCache => {
       return Promise.all(
@@ -46,7 +63,7 @@ self.addEventListener('activate', event => {
       const tempCache = await caches.open(TEMP_CACHE);
       const cachedRequests = await tempCache.keys();
       
-      // ✅ ALL ASSETS ARE CRITICAL - Strict verification
+      // ALL ASSETS ARE CRITICAL - Strict verification
       if (cachedRequests.length === ASSETS.length) {
         console.log('Service Worker: ALL assets staged successfully, updating live cache');
         
@@ -71,37 +88,40 @@ self.addEventListener('activate', event => {
         
         console.log('Service Worker: Cache replacement completed successfully');
       } else {
-        // ❌ FAILURE: Not all assets → Keep old version
+        // FAILURE: Not all assets → Keep old version
         console.error(`Service Worker: Incomplete staging - expected ${ASSETS.length}, got ${cachedRequests.length}. Keeping old cache.`);
         await caches.delete(TEMP_CACHE);
       }
       
+      // Take control of all open tabs immediately
       await self.clients.claim();
     })()
   );
 });
 
-// 🚀 ROBUST STRATEGY: CACHE FIRST WITH INTELLIGENT FALLBACK
+// ROBUST STRATEGY: NETWORK FIRST WITH FULL APP CACHE FALLBACK
 self.addEventListener('fetch', event => {
   event.respondWith(handleFetch(event.request));
 });
 
 async function handleFetch(request) {
   try {
-    // 1️⃣ ALWAYS TRY CACHE FIRST
-    const cachedResponse = await caches.match(request);
-    
-    if (cachedResponse) {
-      console.log(`Service Worker: Serving from cache: ${request.url}`);
-      
-      // 2️⃣ CACHE HIT: Update in background if possible
-      updateCacheInBackground(request);
-      
-      return cachedResponse;
+    // Check if we're offline
+    if (!navigator.onLine) {
+      console.log(`Service Worker: No internet - serving from cache: ${request.url}`);
+      return await serveFromCache(request);
     }
     
-    // 3️⃣ CACHE MISS: Try network
-    console.log(`Service Worker: Cache miss, trying network: ${request.url}`);
+    // Online - check if this is a first-time user (no cache)
+    const hasCache = await checkIfCacheExists();
+    
+    if (!hasCache) {
+      console.log(`Service Worker: First time user - MUST wait for network: ${request.url}`);
+      return await fetchFromNetworkWithExtendedTimeout(request);
+    }
+    
+    // Existing user with cache - try network with short timeout
+    console.log(`Service Worker: Existing user - trying network with fallback: ${request.url}`);
     return await fetchFromNetworkWithFallback(request);
     
   } catch (error) {
@@ -110,59 +130,108 @@ async function handleFetch(request) {
   }
 }
 
-async function fetchFromNetworkWithFallback(request) {
+async function checkIfCacheExists() {
   try {
-    const networkResponse = await fetch(request);
+    const cache = await caches.open(LIVE_CACHE);
+    const keys = await cache.keys();
+    return keys.length > 0;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function fetchFromNetworkWithExtendedTimeout(request) {
+  try {
+    console.log(`Service Worker: First time user - extended network timeout: ${request.url}`);
     
-    // ✅ CRITICAL CHECK: Server error?
+    // Extended timeout for first-time users (30 seconds)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Network request timeout - first time user')), 30000);
+    });
+    
+    const networkResponse = await Promise.race([
+      fetch(request),
+      timeoutPromise
+    ]);
+    
     if (!networkResponse.ok) {
-      console.warn(`Service Worker: Server error ${networkResponse.status} for ${request.url}`);
-      
-      // Try to serve from cache even if not exact match
-      const fallbackResponse = await findFallbackInCache(request);
-      if (fallbackResponse) {
-        console.log('Service Worker: Using fallback from cache due to server error');
-        return fallbackResponse;
-      }
-      
-      // If no fallback, return server error
-      return networkResponse;
+      throw new Error(`Server error: ${networkResponse.status}`);
     }
     
-    // ✅ NETWORK RESPONSE OK: Cache it
-    console.log(`Service Worker: Network success for ${request.url}`);
+    // SUCCESS: Cache for future use
+    console.log(`Service Worker: First time success - caching: ${request.url}`);
+    const cache = await caches.open(LIVE_CACHE);
+    cache.put(request, networkResponse.clone());
+    
+    return networkResponse;
+    
+  } catch (error) {
+    console.error('Service Worker: First time user network failed:', error);
+    
+    // Return timeout error code (not server error)
+    return new Response('Network timeout - connection too slow', {
+      status: 408,
+      statusText: 'Request Timeout'
+    });
+  }
+}
+
+async function serveFromCache(request) {
+  const cachedResponse = await caches.match(request);
+  
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+  
+  // Try fallback strategies for cache
+  const fallbackResponse = await findFallbackInCache(request);
+  if (fallbackResponse) {
+    return fallbackResponse;
+  }
+  
+  return createErrorResponse(request);
+}
+
+async function fetchFromNetworkWithFallback(request) {
+  try {
+    console.log(`Service Worker: Attempting network request: ${request.url}`);
+    
+    // Create timeout promise (5 seconds max wait)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Network request timeout')), 5000);
+    });
+    
+    // Race between network request and timeout
+    const networkResponse = await Promise.race([
+      fetch(request),
+      timeoutPromise
+    ]);
+    
+    // CRITICAL CHECK: Server error?
+    if (!networkResponse.ok) {
+      console.warn(`Service Worker: Server error ${networkResponse.status} - falling back to cache`);
+      return await serveFromCache(request);
+    }
+    
+    // NETWORK SUCCESS: Cache it and return
+    console.log(`Service Worker: Network success for ${request.url} - caching response`);
     const cache = await caches.open(LIVE_CACHE);
     cache.put(request, networkResponse.clone());
     
     return networkResponse;
     
   } catch (networkError) {
-    console.error('Service Worker: Network completely failed:', networkError);
-    
-    // Network completely down: look for fallback
-    const fallbackResponse = await findFallbackInCache(request);
-    if (fallbackResponse) {
-      console.log('Service Worker: Using fallback due to network failure');
-      return fallbackResponse;
+    // Check if it's a timeout vs other network error
+    if (networkError.message.includes('timeout')) {
+      console.log('Service Worker: Network timeout - falling back to cache');
+    } else {
+      console.error('Service Worker: Network request failed - falling back to cache');
     }
-    
-    return createErrorResponse(request);
+    return await serveFromCache(request);
   }
 }
 
-async function updateCacheInBackground(request) {
-  try {
-    const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
-      const cache = await caches.open(LIVE_CACHE);
-      await cache.put(request, networkResponse.clone());
-      console.log(`Service Worker: Background update successful for ${request.url}`);
-    }
-  } catch (error) {
-    console.log(`Service Worker: Background update failed for ${request.url}:`, error);
-    // Silent failure in background
-  }
-}
+// Remove background update function - not needed for network-first strategy
 
 async function findFallbackInCache(request) {
   const cache = await caches.open(LIVE_CACHE);
@@ -194,85 +263,18 @@ async function findFallbackInCache(request) {
 }
 
 function createErrorResponse(request) {
-  // Minimal error page for universal apps
-  const isHtmlRequest = request.destination === 'document' || 
-                       request.headers.get('accept')?.includes('text/html');
-  
-  if (isHtmlRequest) {
-    return new Response(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Application temporarily unavailable</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            text-align: center; 
-            padding: 50px; 
-            background: #f5f5f5; 
-          }
-          .error-container { 
-            background: white; 
-            padding: 40px; 
-            border-radius: 10px; 
-            max-width: 500px; 
-            margin: 0 auto; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-          }
-          .retry-btn { 
-            background: #007cba; 
-            color: white; 
-            border: none; 
-            padding: 12px 24px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            margin-top: 20px; 
-          }
-        </style>
-      </head>
-      <body>
-        <div class="error-container">
-          <h2>⚠️ Service temporarily unavailable</h2>
-          <p>The application cannot connect to the server right now.</p>
-          <p>This app is designed to work offline once loaded.</p>
-          <button class="retry-btn" onclick="window.location.reload()">
-            🔄 Retry
-          </button>
-        </div>
-        <script>
-          // Automatic reconnection attempt every 30 seconds
-          setTimeout(() => {
-            if (navigator.onLine) {
-              window.location.reload();
-            }
-          }, 30000);
-        </script>
-      </body>
-      </html>
-    `, {
-      status: 503,
-      statusText: 'Service Temporarily Unavailable',
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-cache'
-      }
-    });
-  } else {
-    // For non-HTML assets
-    return new Response('Service temporarily unavailable', {
-      status: 503,
-      statusText: 'Service Temporarily Unavailable',
-      headers: {
-        'Content-Type': 'text/plain',
-        'Cache-Control': 'no-cache'
-      }
-    });
-  }
+  // Simple text error response - no HTML
+  return new Response('Service temporarily unavailable', {
+    status: 503,
+    statusText: 'Service Temporarily Unavailable',
+    headers: {
+      'Content-Type': 'text/plain',
+      'Cache-Control': 'no-cache'
+    }
+  });
 }
 
-// 📊 DEBUG EVENTS (optional)
+// DEBUG EVENTS (optional)
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
