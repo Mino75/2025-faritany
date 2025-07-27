@@ -1,19 +1,4 @@
 
-// ----------------------------
-// Service Worker Registration
-// ----------------------------
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').then(() => {
-    console.log('Service Worker Registered');
-  });
-  navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data.action === 'reload') {
-      console.log('New version available. Reloading...');
-      window.location.reload();
-    }
-  });
-}
-
 // Board configuration
 const COLS = 22;  // 22 columns
 const ROWS = 38;  // 38 rows
